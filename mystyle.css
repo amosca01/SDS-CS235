@@ -1,0 +1,51 @@
+.w3-dropdown-content {
+    overflow: auto;
+    max-height: 500px;
+}
+
+.zybook-code {
+    background-color: #f5f5f5;
+    border: 2px solid #b0bec5;
+    color: #f57c00;
+    font-size: 20px;
+    font-weight: 700;
+    padding: 3px;
+    margin: 20px;
+}
+
+.speaker {
+    font-weight: bold; 
+    color: red; 
+}
+
+.proj {
+    font-weight: bold; 
+    color: darkgreen; 
+}
+
+.italic {
+    font-style: italic;
+}
+
+col.hide {
+    visibility: collapse; 
+/*    display: none;*/
+}
+
+.noClass {
+    background: #FFFFE0;
+}
+
+.presy {
+    background: #F0F8FF;
+}
+
+.inClass {
+    font-weight: bold; 
+    color: darkorange; 
+}
+
+.exam {
+    font-weight: bold; 
+    color: darkblue; 
+}
