@@ -1,7 +1,7 @@
 ﻿class-row,class-topic,Week,Day,Date,Topic,Assign-OUT,Assign-DUE,
 ,,1,T,3-Sep,Introduction,,,
 ,,,R,5-Sep,Mental Models and Visual Perception,,,
-,,2,T,10-Sep,Data Wrangling with Python and R,,,
+,,2,T,10-Sep,Data Wrangling with Python,,,
 ,,,R,12-Sep,Data Visualization 101,hw01,,
 ,,3,T,16-Sep,Interaction,,,
 ,,,R,19-Sep,Coordinating Multiple Views,hw02,hw01,
