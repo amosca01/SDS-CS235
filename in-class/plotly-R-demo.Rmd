@@ -1,0 +1,112 @@
+---
+title: 'Demo: Plotly'
+output:
+  html_document:
+    css: lab.css
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+This tutorial comes from Carson Sievert's [Plotly for R Master Class](https://plotly-book.cpsievert.me/index.html).
+
+# Case Study: housing sales in Texas
+
+## Loading `plotly`
+The `plotly` package depends on `ggplot2` which bundles a data set on monthly housing sales in Texan cities acquired from the [TAMU](http://recenter.tamu.edu/) real estate center. After the loading the package, the data is "lazily loaded"" into your session, so you may reference it by name:
+
+```{r}
+library(plotly)
+txhousing
+```
+
+## Good old `ggplot2`
+Let's see if there's any pattern in house price behavior over time:
+```{r}
+p <- txhousing %>%
+  group_by(city) %>%
+    ggplot(aes(x = date, y = median)) +
+      geom_line(aes(group = city), alpha = 0.2)
+p
+```
+
+## Make it interactive
+It'd be nice if we could see which city each line corresponds to when we hover. `plotly` makes this easy! Just wrap your `ggplot` object in the  `ggplotly()` function:
+
+```{r}
+class(p)
+ggplotly(p)
+```
+
+If we just want the city name, we can specify exactly what to put in the tooltip:
+```{r}
+
+ggplotly(p, tooltip = "city")
+
+```
+
+## Tidying up with `plot_ly()`
+We can also build `plotly` objects directly using the `plot_ly()` function along with `dplyr`-like syntax. Why would we want to? Well, for one thing, `plot_ly()` recognizes and preserves groupings created with `dplyr`’s `group_by()` function:
+
+```{r}
+library(dplyr)
+tx_grouped <- group_by(txhousing, city)
+
+# initiate a plotly object with date on x and median on y
+p <- plot_ly(tx_grouped, x = ~date, y = ~median)
+
+plotly_data(p)
+```
+
+Since we didn't specify any mapping, the plot defaults to a scatterplot:
+```{r}
+p
+```
+
+Let's change that to a line chart. Similar to `geom_line()` in `ggplot2`, the `add_lines()` function connects (a group of) x/y pairs with lines in the order of their x values and returns the transformed `plotly` object:
+
+```{r}
+p %>%
+  add_lines(alpha = 0.2, name = "Texan Cities")
+```
+
+## Highlighting
+Want to highlight a particular line? Filtering works, and since each `add_lines()` call returns a pointer to the modified `plotly` object, we can chain calls together with pipes:
+
+```{r}
+p <- txhousing %>%
+  group_by(city) %>%
+  plot_ly(x = ~date, y = ~median) %>%
+  add_lines(alpha = 0.2, name = "Texan Cities", hoverinfo = "none") %>%
+  filter(city == "Houston") %>%
+  add_lines(name = "Houston")
+```
+
+## Zooming with context
+Want to zoom in without losing context? Try a `rangeslider()`:
+
+```{r}
+rangeslider(p)
+```
+
+## Any `ggplot` will do...
+And just so you don't think we're limited to line charts:
+
+```{r}
+p2 <- txhousing %>%
+  ggplot(aes(date, median)) + geom_bin2d()
+p2 <- ggplotly(p2)
+p2
+```
+
+Check out [The Plotly Cookbook](https://plotly-book.cpsievert.me/the-plotly-cookbook.html) for more details on specific plotly visualization types ("traces").
+
+# Your Turn!
+Find a new data set to practice with and create at least 2 different interactive plots. 
