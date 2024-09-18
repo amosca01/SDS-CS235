@@ -1,0 +1,159 @@
+---
+title: 'Demo: Plotly CMVs'
+output:
+  html_document:
+    css: lab.css
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+This tutorial comes from Carson Sievert's [Plotly for R Master Class](https://plotly-book.cpsievert.me/index.html).
+
+# Combining Views
+
+## Setting up 
+```{r}
+
+library(plotly)
+library(tidyverse)
+
+p <- txhousing %>% 
+  group_by(city) %>%
+  plot_ly(x = ~date, y = ~median) %>%
+  add_lines(alpha = 0.2, name = "All TX Cities", hoverinfo = "none") %>%
+  filter(city == "Houston") %>%
+  add_lines(name = "Houston")
+
+p2 <- ggplotly(ggplot(txhousing, aes(date, median)) + geom_bin2d())
+
+```
+
+## With `htmlwidgets`
+
+Since `plotly` objects inherit properties from an `htmlwidget` object, any method that works for arranging `htmlwidgets` also works for plotly objects. In some sense, an `htmlwidget` object is just a collection of HTML tags, and the htmltools package provides some useful functions for working with HTML tags ([RStudio and Inc. 2016](https://plotly-book.cpsievert.me/arranging-htmlwidgets.html#ref-htmltools)). The `tagList()` function gathers multiple HTML tags into a tag list, and when printing a tag list inside of a knitr/rmarkdown document ([Xie 2016](https://plotly-book.cpsievert.me/arranging-htmlwidgets.html#ref-knitr); [Allaire et al. 2016](https://plotly-book.cpsievert.me/arranging-htmlwidgets.html#ref-rmarkdown)), it knows to render as HTML:
+
+```{r}
+
+library(htmltools)
+
+tagList(p, p2)
+
+```
+
+This renders two plots, each in its own row spanning the width of the page, because each `htmlwidget` object is an HTML `<div>` tag. More often than not, it is desirable to arrange multiple plots in a given row, and there are a few ways to do that. A very flexible approach is to wrap all of your plots in a flexbox (i.e., an HTML `<div>` with `display: flex` Cascading Style Sheets (CSS) property). The `tags$div()` function from htmltools provides a way to wrap a `<div>` around both tag lists and `htmlwidget` objects, and set attributes, such as style.
+
+```{r}
+
+tags$div(
+  style = "display: flex; flex-wrap: wrap",
+  tags$div(p, style = "width: 45%; padding: 1em;"),
+  tags$div(p2, style = "width: 45%; padding: 1em;")
+)
+
+```
+
+## With `shiny`
+
+Another way to arrange multiple `htmlwidget` objects on a single page is to leverage the `fluidPage()`, `fluidRow()`, and `column()` functions from the `shiny` package:
+```{r}
+
+library(shiny)
+
+fluidPage(
+  fluidRow(
+    column(6, p), column(6, p2)
+  )
+)
+
+```
+
+## With `subplot()`
+
+We could also use `plotly`'s built-in `subplot()` function to generate a single plotly object with a common y-axis
+```{r}
+
+subplot(
+  p, p2,
+  shareY = TRUE
+)
+
+```
+
+## With `crosstalk`
+`crosstalk` is the R implementation of the powerful [crossfilter](http://square.github.io/crossfilter/) JS library. Though this dataset isn't very large, we'll use it to create a `SharedData` object that allows us to propagate interaction.
+
+```{r}
+
+library(crosstalk)
+
+shared_data <- txhousing %>%
+  filter(city %in% c("Austin", "Houston", "Dallas")) %>%
+  SharedData$new(~year)
+
+```
+
+As far as `ggplotly()` and `plot_ly()` are concerned, `SharedData` object(s) act just like a data frame, but with a special `key` attribute attached to graphical elements. Since both interfaces are based on the layered grammar of graphics, `key` attributes can be attached at the layer level, and those attributes can also be shared across multiple views. Let's leverage both of these features to link multiple views of median house sales in various Texan cities:
+
+```{r}
+
+p <- ggplot(shared_data, aes(month, median)) + 
+  geom_line(aes(group = year)) + 
+  facet_wrap(~ city)
+
+ggplotly(p, tooltip = "year") %>%
+  highlight(color = "red") # click on a line to see highlight 
+
+```
+
+We can also link different views, like those from `ggpairs`. Let's look at the `penguins` dataset because it's easy on the eyes:
+```{r}
+
+library(palmerpenguins)
+
+penguins <- penguins %>% select(species, 
+                                bill_length_mm, 
+                                bill_depth_mm, 
+                                flipper_length_mm, 
+                                body_mass_g) %>% 
+  drop_na()
+
+shared_penguins <- SharedData$new(penguins)
+
+p <- GGally::ggpairs(shared_penguins, aes(color = species), columns = 2:5)
+
+highlight(ggplotly(p), on = "plotly_selected") # brush to see brushing and linking 
+
+```
+
+Really, we can link any collection of `htmlwidgets`:
+```{r}
+library(leaflet)
+
+shared_quakes <- SharedData$new(quakes)
+
+p <- plot_ly(shared_quakes, x = ~depth, y = ~mag) %>% 
+  add_markers(alpha = 0.5) %>%
+  highlight("plotly_selected", dynamic = TRUE)
+
+map <- leaflet(shared_quakes) %>% 
+  addTiles() %>% 
+  addCircles()
+
+bscols(widths = c(6, 6), p, map)
+```
+
+We'll play more with `leaflet` maps in our upcoming unit on geograhic data.
+
+# Your turn! 
+Using the `palmerspenguins` dataset create:
+1. A scatterplot showing bill_length_mm by flipper_length_mm, colored by species. 
+2. A barchart showing counts of penguins across species. 
+3. Link the two charts such that brushing over points in the scatterplot causes the barchart to show counts only for selected points.  
