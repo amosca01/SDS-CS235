@@ -1,0 +1,253 @@
+---
+title: 'Demo: Time-Varying Data'
+output:
+  html_document:
+    css: ../lab.css
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Just the basics
+Working with time-varying data can be challenging, because unlike much of the relational data we're used to working with, observations in data that varies over time are (by definition) not independent. Luckily for us, time-varying data is also quite common, so there exist plenty of tools that can help us. 
+
+First we'll need some time-varying data to play around with, like this one on Johnson & Johnson's quarterly earnings from 1960-1980:
+
+```{r}
+help(JohnsonJohnson)
+```
+
+Note that this data isn't stored as a DataFrame; it's a `TimeSeries` object:
+
+```{r}
+class(JohnsonJohnson)
+```
+
+This poses problem for our usual methods, since `ggplot` only really knows how to work with `DataFrames`... but no worries! We can use the `ggfortify` package to help us out:
+
+```{r}
+library(ggfortify)
+```
+
+# Our first time series plot
+_This portion of the demo adapted from Tural Sadigov's unit on [Time Plots](https://www.coursera.org/learn/practical-time-series-analysis/lecture/iR9c6/time-plots) from his Coursera course on [Practical Time Series Analysis](https://www.coursera.org/learn/practical-time-series-analysis)._
+
+Let's start with a simple plot, built for us auto-magically by `ggfortify`'s `autoplot.ts()` function:
+```{r}
+autoplot(JohnsonJohnson)
+```
+
+Nice! We can see that there's a general positive trend over time, with what appears to be little seasonal ebbs and flows and *maybe* a couple of inflection points.
+
+Want to highlight places where the mean and variance changes? The `changepoint` package provides some useful functions:
+
+```{r}
+library(magrittr) # Because we like piping
+
+library(changepoint)
+JohnsonJohnson %>%
+  changepoint:: cpt.meanvar() %>%  # Identify change points
+  autoplot()
+```
+
+Want to highlight the peaks and valleys? The `ggpmisc` package can help:
+```{r}
+library(ggpmisc)
+
+JohnsonJohnson %>%
+  ggplot() + geom_line() +
+  stat_peaks(colour = "green") +
+  stat_valleys(colour = "blue")
+```
+
+## Seasonality vs. trend
+Let's check out another dataset, this time from the `astsa` package for Applied Statistical Time Series Analysis:
+
+```{r}
+library(astsa)
+```
+
+The `flu` dataset contains records of monthly pneumonia and influenza deaths (per 10k people) in the U.S. from 1968 through 1978:
+
+```{r}
+help(flu)
+```
+
+Again, this is a time-series object, but `ggfortify` can handle it:
+
+```{r}
+flu %>%
+  ggplot() + geom_line()
+```
+
+Whew, look at that seasonality! A seasonal time series is made up of three parts: an overall trend, a seasonal component, and niose (also known as the irregular component). If we want, we can `decompose()`  (or estimate) the time series into these three components:
+
+```{r}
+decompose(flu) %>%
+  plot()
+```
+
+Sweet: now we can see that despite the seasonal spikes that are relatively consistent in magnitude, the overall trend is negative (that is, fewer deaths per year in the long term).
+
+# A little more complex: NEON Harvard Forest Data
+Now let's check out a slightly more interesting dataset: [meterological data](data/Met_HARV_Daily_2009_2011.csv) collected at the National Ecological Observatory Network's Harvard Forest field site. The following walkthrough is adapted from [Time Series 05: Plot Time Series with ggplot2 in R](https://www.neonscience.org/resources/learning-hub/tutorials/dc-time-series-plot-ggplot-r) by Jones et al. at NEON:
+
+```{r}
+# daily HARV met data, 2009-2011
+harMetDaily <- read.csv(
+  file="data/Met_HARV_Daily_2009_2011.csv",
+  stringsAsFactors = FALSE)
+
+# convert date to Date class
+harMetDaily$date <- as.Date(harMetDaily$date)
+```
+
+Let's take a peek at the raw data:
+
+```{r}
+head(harMetDaily)
+```
+
+All kinds of good stuff in there! Let's begin with a quick scatterplot of air temperature over time:
+
+```{r}
+p <- harMetDaily %>%
+  ggplot(aes(date, airt)) + geom_point() +
+  ggtitle("Air Temperature 2009-2011\nNEON Harvard Forest Field Site") +
+           xlab("Date") + ylab("Air Temperature (C)")
+p
+```
+
+This is fine, but it might be nice to do some formatting on those dates. Never fear: the `scales` package is here!
+
+```{r}
+library(scales)
+p <- p + scale_x_date(labels=date_format("%b %Y"))
+p
+```
+
+Want to add a trend line? No problem - the `stat_smooth()` function attempts to model the overall shape of the data as follows:
+
+- For data with < 1000 observations: the default model is a loess model (a non-parametric regression model)
+- For data with > 1,000 observations: the default model is a GAM (a general additive model)
+- A specific model/method can also be specified: for example, a linear regression (`method="lm"`).
+
+```{r}
+p <- p + stat_smooth()
+p
+```
+
+Just be careful! A trend line is a **statistical transformation of the data**. It's up to you to determine is a particular statistical transformation is meaningful / appropriate!
+
+# Distribution over time
+_This portion of the demo is adapted from Sara Altman and Bill Beherman's unit on [Time Series](https://dcl-data-vis.stanford.edu/time-series.html)._
+
+Sometimes it can be helpful to aggregate over time, rather than just plotting raw values. Let's take a look at our old friend `nycflights13` for an example:
+
+```{r}
+library(nycflights13)
+head(flights)
+```
+
+Time can be stored at varying levels of granularity. For example, the `nycflights13::flights` variable `time_hour` is a date-time:
+
+```{r}
+flights %>% 
+  dplyr::select(time_hour)
+```
+
+When we map time_hour to an aesthetic, `ggplot2` uses `scale_*_datetime()`, the scale function for `date-time`s. There is also `scale_*_date()` for `date`s and `scale_*_time()` for `time`s. The `date`- and `time`-specific scale functions are useful because they create meaningful breaks and labels. The `lubridate` package comes in especially handy when manipulating time-based data:
+
+```{r}
+library(lubridate)
+```
+
+
+Let's try aggregating this data to see how flights were distributed over the first two days of the year:
+
+```{r}
+flights_0101_0102 <- flights %>% 
+  dplyr::filter(month == 1, day <= 2) %>% 
+  dplyr::group_by(time_hour = lubridate::floor_date(time_hour, "hour")) %>% 
+  dplyr::summarize(num_flights = dplyr::n()) 
+
+flights_0101_0102 %>% 
+  ggplot(aes(time_hour, num_flights)) +
+    geom_col()
+```
+
+Maybe we can do a little better on those labels:
+
+```{r}
+flights_0101_0102 %>% 
+  ggplot(aes(time_hour, num_flights)) +
+  geom_col() +
+  scale_x_datetime(date_breaks = "6 hours", date_labels = "%a %I %p")
+```
+
+# Time Series Comparison
+Sometimes it can be useful to compare how multiple measures vary with respect to time, and to each other. Let's take a look at some data from [GapMinder](https://www.gapminder.org/), which the Stanford Data Challenge Lab has kindly compiled for us in the `dcldata` package:
+
+```{r}
+# devtools::install_github("dcl-docs/dcldata")
+library(dcldata)
+help(gm_life_expectancy)
+```
+
+This dataset contains information historical and projected life expectancy data for all countries from 1800 to 2100. First, we'll look at a single country:
+
+```{r}
+south_africa <-
+  gm_life_expectancy %>% 
+  dplyr::filter(name == "South Africa")
+
+south_africa %>% 
+  ggplot(aes(year, life_expectancy)) +
+  geom_line()
+```
+
+We observe two major dips in life expectancy in this plot. The first appears to coincide with the 1918 influenza pandemic. The second appears to start in 1994, around the end of apartheid. Let's confirm:
+
+```{r}
+south_africa %>% 
+  ggplot(aes(year, life_expectancy)) +
+  geom_line() +
+  geom_vline(xintercept = 1918, color = "blue") +
+  geom_vline(xintercept = 1994, color = "blue")
+```
+
+_From Sara and Bill: One hypothesis for this second dip is that data reporting procedures may have changed when the South African government changed. Maybe the apartheid government systematically under-sampled non-white groups who may have had lower life expectancies. Another hypothesis is that changes in government led to general upheaval, which somehow affected life expectancy._
+
+To further investigate, we might compare South Africa to its neighbors during this time period:
+
+```{r}
+southern_africa_countries <-
+  gm_life_expectancy %>% 
+  dplyr::filter(name %in% c("South Africa", "Swaziland" ,"Lesotho", "Botswana")) %>% 
+  dplyr::filter(year >= 1980, year <= 2015)
+
+southern_africa_countries %>% 
+  ggplot(aes(year, life_expectancy, color = name)) +
+  geom_vline(xintercept = 1994, color = "blue") +
+  geom_line() +
+  geom_point() +
+  geom_text(
+    aes(label = name),
+    data = southern_africa_countries %>% dplyr::filter(year == 2015),
+    color = "black",
+    hjust = 0,
+    size = 3,
+    nudge_x = 0.5
+  ) +
+  guides(color = "none") +
+  coord_cartesian(xlim = c(1980, 2020)) 
+```
+
+Interestingly, all four countries experienced similar declines in the early 1990s. This suggests that South Africa’s decline in life expectancy might not be directly related to the end of apartheid. Want to explore further? Check out the rest of the `GapMinder` data available in the `dcldata` package to see what you can find!
