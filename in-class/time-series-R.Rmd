@@ -147,7 +147,7 @@ p <- p + stat_smooth()
 p
 ```
 
-Just be careful! A trend line is a **statistical transformation of the data**. It's up to you to determine is a particular statistical transformation is meaningful / appropriate!
+Just be careful! A trend line is a **statistical transformation of the data**. It's up to you to determine if a particular statistical transformation is meaningful / appropriate!
 
 # Distribution over time
 _This portion of the demo is adapted from Sara Altman and Bill Beherman's unit on [Time Series](https://dcl-data-vis.stanford.edu/time-series.html)._
