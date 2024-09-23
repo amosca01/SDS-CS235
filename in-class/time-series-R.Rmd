@@ -13,7 +13,10 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
 ```
+
+Adapted from a demo by Jordan Crouser. 
 
 # Just the basics
 Working with time-varying data can be challenging, because unlike much of the relational data we're used to working with, observations in data that varies over time are (by definition) not independent. Luckily for us, time-varying data is also quite common, so there exist plenty of tools that can help us. 
@@ -50,8 +53,8 @@ Want to highlight places where the mean and variance changes? The `changepoint` 
 
 ```{r}
 library(magrittr) # Because we like piping
-
 library(changepoint)
+
 JohnsonJohnson %>%
   changepoint:: cpt.meanvar() %>%  # Identify change points
   autoplot()
@@ -102,7 +105,7 @@ Now let's check out a slightly more interesting dataset: [meterological data](da
 ```{r}
 # daily HARV met data, 2009-2011
 harMetDaily <- read.csv(
-  file="data/Met_HARV_Daily_2009_2011.csv",
+  file="Met_HARV_Daily_2009_2011.csv",
   stringsAsFactors = FALSE)
 
 # convert date to Date class
@@ -193,12 +196,11 @@ flights_0101_0102 %>%
 ```
 
 # Time Series Comparison
-Sometimes it can be useful to compare how multiple measures vary with respect to time, and to each other. Let's take a look at some data from [GapMinder](https://www.gapminder.org/), which the Stanford Data Challenge Lab has kindly compiled for us in the `dcldata` package:
+Sometimes it can be useful to compare how multiple measures vary with respect to time, and to each other. Let's take a look at some data from [GapMinder](https://www.gapminder.org/):
 
 ```{r}
-# devtools::install_github("dcl-docs/dcldata")
-library(dcldata)
-help(gm_life_expectancy)
+gm_life_expectancy <- read_csv("lex.csv")
+head(gm_life_expectancy)
 ```
 
 This dataset contains information historical and projected life expectancy data for all countries from 1800 to 2100. First, we'll look at a single country:
@@ -206,10 +208,14 @@ This dataset contains information historical and projected life expectancy data 
 ```{r}
 south_africa <-
   gm_life_expectancy %>% 
-  dplyr::filter(name == "South Africa")
+  dplyr::filter(country == "South Africa") %>% 
+  pivot_longer(cols = !country, names_to = "year", values_to = "life_expectancy") %>%
+  select("year", "life_expectancy")
+
+south_africa$year <- as.Date(south_africa$year, format="%Y")
 
 south_africa %>% 
-  ggplot(aes(year, life_expectancy)) +
+  ggplot(aes(x = year, y = life_expectancy)) +
   geom_line()
 ```
 
@@ -230,16 +236,18 @@ To further investigate, we might compare South Africa to its neighbors during th
 ```{r}
 southern_africa_countries <-
   gm_life_expectancy %>% 
-  dplyr::filter(name %in% c("South Africa", "Swaziland" ,"Lesotho", "Botswana")) %>% 
-  dplyr::filter(year >= 1980, year <= 2015)
+  dplyr::filter(country %in% c("South Africa", "Swaziland" ,"Lesotho", "Botswana")) %>% 
+  pivot_longer(cols = !country, names_to = "year", values_to = "life_expectancy") %>%
+  mutate(year = as.numeric(year)) %>%
+  dplyr::filter(year >= 1980 & year <= 2015)
 
 southern_africa_countries %>% 
-  ggplot(aes(year, life_expectancy, color = name)) +
+  ggplot(aes(year, life_expectancy, color = country)) +
   geom_vline(xintercept = 1994, color = "blue") +
   geom_line() +
   geom_point() +
   geom_text(
-    aes(label = name),
+    aes(label = country),
     data = southern_africa_countries %>% dplyr::filter(year == 2015),
     color = "black",
     hjust = 0,
@@ -250,4 +258,8 @@ southern_africa_countries %>%
   coord_cartesian(xlim = c(1980, 2020)) 
 ```
 
-Interestingly, all four countries experienced similar declines in the early 1990s. This suggests that South Africa’s decline in life expectancy might not be directly related to the end of apartheid. Want to explore further? Check out the rest of the `GapMinder` data available in the `dcldata` package to see what you can find!
+Interestingly, all four countries experienced similar declines in the early 1990s. This suggests that South Africa’s decline in life expectancy might not be directly related to the end of apartheid. 
+
+# Your Turn!
+
+Explore further! Check out the rest of the `GapMinder` data available at [https://www.gapminder.org/data/](https://www.gapminder.org/data/) to see what you can find!
