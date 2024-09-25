@@ -1,0 +1,165 @@
+---
+title: 'Demo: Leaflet Maps'
+output:
+  html_document:
+    css: ../lab.css
+    highlight: pygments
+    theme: cerulean
+    toc: true
+    toc_float: true
+---
+
+## Making a map with points in R with leaflet
+
+We're going to be doing a lot of the stuff from the RStudio [leaflet tutorial](https://rstudio.github.io/leaflet/). This walkthrough is a variation of [Amelia McNamara](https://github.com/AmeliaMN)'s version.
+
+Load `leaflet` first:
+```{r}
+library(leaflet)
+```
+
+Let's start with a simple map. We create a map widget by calling `leaflet()`, and then add layers (ex. `addTiles`, `addMarkers`, `addPolygons`) to modify the widget. 
+```{r}
+
+m <- leaflet() %>%
+  setView(-72.518978, 42.381050, zoom = 10) %>%
+  addTiles() %>%  # Load the default OpenStreetMap tile set
+  addMarkers(lng=-72.6403, lat=42.3163, popup = "Smith!")
+m
+
+```
+
+Note that the syntax here is similar to that of `ggplot2`. Please consult the [Leaflet documentation](http://rstudio.github.io/leaflet/) for more details.
+
+## Okay, let's do something with actual data
+
+Lets look at [storm data](http://www.ncdc.noaa.gov/stormevents/ftp.jsp) from the NOAA. It comes in a few files that we need to join together in order to use. For convenience, I've put them on the course website. You can download them manually, as .zip files:
+
+```{r}
+library(readr)
+library(dplyr)
+
+# One file contains information about the storm
+# ignore the warning 
+stormdetails <- read_csv("too-big-for-git/StormEvents_details-ftp_v1.0_d2023_c20240917.csv")
+
+# The other contains actual location data
+stormlocs <- read_csv("too-big-for-git/StormEvents_locations-ftp_v1.0_d2023_c20240917.csv")
+
+# We'll want to use them together, so we'll use a join
+storms <- stormlocs %>%
+  left_join(stormdetails, by="EVENT_ID")
+```
+```{r}
+glimpse(storms)
+```
+
+## Mapping lightning strikes
+Let's pull out the lightning strikes and map them as part of a `dplyr` chain
+```{r}
+lightning_map <- storms %>%               # Start with the storm data
+  filter(EVENT_TYPE == "Lightning") %>%   # Filter down to just the lightning events
+  leaflet() %>%  
+    addTiles() %>%  
+    addMarkers(~LONGITUDE, ~LATITUDE, popup = "Zap!")  
+
+lightning_map
+```
+
+## Challenge: 
+- Find another storm type to map
+- Bonus-- add popups!
+
+## One approach
+
+```{r}
+mtw_map <- storms %>%
+  filter(EVENT_TYPE == "Marine Thunderstorm Wind") %>%
+  leaflet() %>%
+    addTiles() %>% 
+    addMarkers(~LONGITUDE, ~LATITUDE, popup = ~EVENT_NARRATIVE)
+
+mtw_map
+```
+
+
+## Polygons
+
+First let's grab some data (and do a little conversion)
+
+```{r}
+tornados <- storms %>%
+  filter(EVENT_TYPE=="Tornado") %>%
+  mutate(DAMAGE_PROPERTY = as.numeric(sub("K", "", DAMAGE_PROPERTY, fixed = TRUE)))
+```
+
+Then let's start with something easy(ish) -- circles
+```{r}
+m <- leaflet(data = tornados) %>%
+  addTiles() %>% 
+  addCircles(~LONGITUDE, ~LATITUDE, 
+             weight = 1, 
+             radius = ~DAMAGE_PROPERTY*100, # Map the radius of the circle to amount of damage
+             popup = ~EVENT_NARRATIVE)      # Include details about the tornado
+m
+```
+
+## Polgyons come in shapefiles
+Most boundaries (state, national, etc) are provided in terms of polygons. Major mapping software ArcGIS, from ESRI, has essentially set the standard formats. There are many files with different extensions: .prj (the projection), .shp (the shapefile), .cpg (??), .dbf (??), .shx (??). 
+
+You need special software or packages to work with shapefiles. 
+
+## State shapefiles
+
+This portion of the tutorial is based on: [R Graph Gallery](https://r-graph-gallery.com/168-load-a-shape-file-into-r.html)
+
+I got the shapefiles used below from [the Census](https://www.census.gov/geo/maps-data/data/cbf/cbf_state.html). You can choose the resolution. If you want, the zipfile of the shapes I used is on the course website (cb_2018_us_state_500k.zip).  
+
+We're going to use the `sf` package to deal with shapefiles. The sf package offers the `st_read()` and the `read_sf()` functions that allow us to read shapefile using the following syntax.
+
+As a result you get a geospatial object (`my_sf` here) that contains all the information we need for further mapping.
+```{r}
+library(sf)
+
+my_sf <- read_sf("too-big-for-git/cb_2018_us_state_500k/cb_2018_us_state_500k.shp")
+
+print(my_sf) #tells you the max and min coordinates, the kind of projection in use and the the first few rows of the data associated with the regions.
+
+nrow(my_sf) #how many regions you have
+
+```
+Notice how each region has a POLYGON associated with it. 
+
+## Mapping shapefiles
+
+We can map shapefiles using `ggplot2` and the `geom_sf()` function:  
+
+```{r}
+library(ggplot2)
+
+ggplot(my_sf) +
+  geom_sf(fill = "#69b3a2", color = "white") + 
+  theme_void()
+
+```
+
+What if we want just a specific region?
+
+```{r}
+
+newEngland <- my_sf[(my_sf$STUSPS == "ME" | my_sf$STUSPS == "NH" | my_sf$STUSPS == "VT" | 
+                      my_sf$STUSPS == "MA" | my_sf$STUSPS == "RI" | my_sf$STUSPS == "CT"), ]
+
+plot(st_geometry(newEngland),
+  col = "steelblue", lwd = 0.5
+)
+
+```
+
+## Your Turn!
+
+Put it all together! See if you can make a map of your own data, and embed it within a dashboard. **Bonus:** can you make them interact with one another?
+
+## Resources
+Follow the links above to more resources for geospatial visualization with R
+
