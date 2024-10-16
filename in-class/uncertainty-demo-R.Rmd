@@ -1,0 +1,110 @@
+---
+title: "uncertainty-vis"
+output: html_document
+date: "2024-10-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Uncertainty Visualization Demo
+
+In this demo we will review different methods for visualizing uncertainty. We'll use the palmerspenguins data for the demo.
+
+```{r}
+library(tidyverse)
+library(palmerpenguins)
+
+head(penguins)
+```
+### Probability Distributions 
+First, let's generate a normal probability distribution of mean `bill_length_mm`.
+
+```{r}
+
+bill_mean <- mean(penguins$bill_length_mm, na.rm = TRUE)
+bill_sd <- sd(penguins$bill_length_mm, na.rm = TRUE)
+
+# generate normal distribution from mean and sd
+bill_norm <- data.frame(rnorm(1000, mean = bill_mean, sd = bill_sd))
+names(bill_norm)[1] <- "bill_length_mm"
+
+bill_norm %>% 
+  ggplot( aes(x = bill_length_mm)) + 
+  geom_density(fill="#69b3a2", color="#e9ecef", alpha=0.8)
+
+```
+
+We can also look at the distribution of `bill_length_mm` in our original dataset. 
+
+```{r}
+
+penguins %>% 
+  ggplot( aes(x = bill_length_mm)) + 
+  geom_density(fill="#69b3a2", color="#e9ecef", alpha=0.8)
+
+```
+
+
+Interesting, maybe our data is bimodal? 
+
+#### Violins
+
+Alternatively, we could use violin plots to show distribution by species.  
+
+```{r}
+
+penguins %>%
+  ggplot(aes(x = species, y = bill_length_mm)) +
+  geom_violin() +
+  theme_minimal() 
+
+```
+
+
+Hmm... maybe only two species are bimodal? 
+
+### Showing Uncertainty for Multiple Points on a Plot 
+
+Now let's look at something a little more interesting. Let's say we want to look at mean bill length by species. We can do this with a bar chart:
+
+```{r}
+# data wrangling
+df <- penguins %>% 
+  group_by(species) %>%
+  summarise(mean = mean(bill_length_mm, na.rm = TRUE),
+         sd = sd(bill_length_mm, na.rm = TRUE))
+
+# plotting 
+df %>%
+  ggplot() + 
+  geom_bar(aes(x = species, y = mean), stat = "identity", fill="skyblue", alpha=0.5) + 
+  theme_minimal()
+  
+```
+
+#### Error Bars
+But a bar chart alone won't show the uncertainty in means. Let's add error bars:
+
+```{r}
+
+df %>%
+  ggplot() + 
+  geom_bar(aes(x = species, y = mean), stat = "identity", fill = "skyblue", alpha = 0.5) + 
+  geom_errorbar(aes(x = species, y = mean, ymin = mean - sd, ymax = mean + sd),
+                width = 0.4, color = "orange", alpha = 0.9)
+
+```
+
+
+Try out `geom_crossbar()`, `geom_linerange()`, and `geom_pointrange()` as well.  
+
+## Challenge 
+
+### HOPs 
+
+Hypothetical Outcome Plots show uncertainty through animation that moves between possible outcomes. For example, a HOP that shows mean `bill_length_mm` by `species`, might show a bar for each `species` that varies in height from `mean - sd` to `mean + sd`, according to probabilities from a normal distribution. 
+
+Your task for the last part of this demo is to **try** to make a HOP version of the bar chart above. You will need to do some data wrangling, and then look into animation. I recommend starting by clearly mapping out your plan for implementing a HOP. Then, generate the data you will need, and finally look at gganimate to help you animate your plot. 
+
